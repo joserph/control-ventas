@@ -21,8 +21,15 @@
 						<div>
 							<input wire:model='keyWord' type="text" class="form-control" name="search" id="search" placeholder="Buscar Venta">
 						</div>
+						<div style="display: inline-flex">
+							{{ Form::open(['route' => 'ventas-excel.store', 'class' => 'form-horizontal']) }}
+								<input type="date" name="desde" class="form-control">
+								<input type="date" name="hasta" class="form-control">
+								<button type="submit" target="_blank" class="btn btn-xs btn-outline-success pull-right"><i class="fas fa-file-excel"></i></button>
+							{{ Form::close() }}
+						</div>
 						<div class="btn btn-sm btn-info" data-toggle="modal" data-target="#createDataModal">
-						<i class="fa fa-plus"></i>  Agreagr Venta
+							<i class="fa fa-plus"></i>  Agreagr Venta
 						</div>
 					</div>
 				</div>

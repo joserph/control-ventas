@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\ExcelController;
 
 /*
 |--------------------------------------------------------------------------
@@ -26,3 +27,5 @@ Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name
 	Route::view('partners', 'livewire.partners.index')->middleware('auth');
 	Route::view('servicios', 'livewire.servicios.index')->middleware('auth');
 	Route::view('vigencias', 'livewire.vigencias.index')->middleware('auth');
+	//Route::get('ventas-excel', 'App\Http\Controllers\ExcelController@salesExcel')->name('ventas.excel')->middleware('auth');
+	Route::resource('/ventas-excel', 'App\Http\Controllers\ExcelController')->names('ventas-excel');
