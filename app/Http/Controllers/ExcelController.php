@@ -38,7 +38,7 @@ class ExcelController extends Controller
     public function store(Request $request)
     {
         
-        $ventas = Venta::whereBetween('date', [$request->desde, $request->hasta])->with('validity')->with('service')->with('partner')->get();
+        $ventas = Venta::whereBetween('date', [$request->desde, $request->hasta])->orderBy('date', 'ASC')->with('validity')->with('service')->with('partner')->get();
         //dd($ventas);
         if($ventas->count() > 0)
         {
@@ -67,9 +67,11 @@ class ExcelController extends Controller
             $spreadsheet->getActiveSheet()->getColumnDimension('L')->setWidth(20);
             $spreadsheet->getActiveSheet()->getColumnDimension('M')->setWidth(20);
             $spreadsheet->getActiveSheet()->getColumnDimension('N')->setWidth(12);
+            $spreadsheet->getActiveSheet()->getColumnDimension('O')->setWidth(15);
+            $spreadsheet->getActiveSheet()->getColumnDimension('P')->setWidth(15);
             /* CABECERA */
-            $sheet->getStyle('A1:N1')->applyFromArray($styleArray);
-            $spreadsheet->getActiveSheet()->getStyle('A1:N1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            $sheet->getStyle('A1:P1')->applyFromArray($styleArray);
+            $spreadsheet->getActiveSheet()->getStyle('A1:P1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
             ->getStartColor()->setRGB('17a2b8');
             $sheet->setCellValue('A1', 'N° SOLICITUD');
             $sheet->setCellValue('B1', 'FECHA');
@@ -78,19 +80,30 @@ class ExcelController extends Controller
             $sheet->setCellValue('E1', 'VIGENCIA');
             $sheet->setCellValue('F1', 'SERVICIO');
             $sheet->setCellValue('G1', 'ESTATUS');
-            $sheet->setCellValue('H1', 'SUB TOTAL');
-            $sheet->setCellValue('I1', 'TOTAL');
+            $sheet->setCellValue('H1', 'SUB TOTAL PARTNER');
+            $sheet->setCellValue('I1', 'TOTAL PARTNER');
             $sheet->setCellValue('J1', 'FORMA DE PAGO');
             $sheet->setCellValue('K1', 'BANCO');
             $sheet->setCellValue('L1', 'PARTNER');
             $sheet->setCellValue('M1', 'ADICIONAL COBRADOS');
             $sheet->setCellValue('N1', 'DESCUENTOS');
+            $sheet->setCellValue('O1', 'COSTO ANDREA');
+            $sheet->setCellValue('P1', 'GANACIA NETA');
+
             /* PINTAMOS LOS DATOS */
             $col = 2;
             foreach($ventas as $key => $item)
             {
+                
+                $spreadsheet->getActiveSheet()->getStyle('H' . $col)->getNumberFormat()->setFormatCode('#,##0.00');
+                $spreadsheet->getActiveSheet()->getStyle('I' . $col)->getNumberFormat()->setFormatCode('#,##0.00');
+                $spreadsheet->getActiveSheet()->getStyle('M' . $col)->getNumberFormat()->setFormatCode('#,##0.00');
+                $spreadsheet->getActiveSheet()->getStyle('N' . $col)->getNumberFormat()->setFormatCode('#,##0.00');
+                $spreadsheet->getActiveSheet()->getStyle('O' . $col)->getNumberFormat()->setFormatCode('#,##0.00');
+                $spreadsheet->getActiveSheet()->getStyle('P' . $col)->getNumberFormat()->setFormatCode('#,##0.00');
+
                 $sheet->setCellValue('A' . $col, $key+1);
-                $sheet->setCellValue('B' . $col, $item->date);
+                $sheet->setCellValue('B' . $col, date('d-m-Y', strtotime($item->date)));
                 $sheet->setCellValue('C' . $col, $item->identification);
                 $sheet->setCellValue('D' . $col, $item->client);
                 $sheet->setCellValue('E' . $col, $item->validity->years);
@@ -103,13 +116,38 @@ class ExcelController extends Controller
                 $sheet->setCellValue('L' . $col, $item->partner->name);
                 $sheet->setCellValue('M' . $col, $item->aditional_price);
                 $sheet->setCellValue('N' . $col, $item->discount);
+                /* COSTO ANDREA */
+                //$costoA = $item->validity->price_total;
+                $sheet->setCellValue('O' . $col, $item->validity->price_total);
+                /* CALCULO DE GANANCIA NETA */
+                if($item->validity->type == 'Ecuafact mas firma' || $item->validity->type == 'Ecuafact mas firma partner nuevo')
+                {
+                    // $resta = $item->validity->price_total - $item->validity->price_partner;
+                    // $gancia = 9 - $resta;
+                    $sheet->setCellValue('P' . $col, '=+9-(O' .$col . '-I' .$col . ')');
+                }elseif($item->validity->type == 'Facturito Ilimitado' || $item->validity->type == 'Facturito 100 doc'){
+                    //$gancia = ($item->sub_total - $item->validity->price_total) + ($item->validity->price_total * 10 / 100);
+                    $sheet->setCellValue('P' . $col, '=+(H' . $col . '-O' . $col . ')+(O' . $col . '*10/100)');
+                }else{
+                    //$gancia = ($item->sub_total - $item->validity->price_total) + $item->aditional_price;
+                    $sheet->setCellValue('P' . $col, '=+(H' . $col . '-O' . $col . ')+M' . $col);
+                }
                 $col++;
             }
+            $sheet->getStyle('A2:P' . $col)->applyFromArray($styleArray);
+            //$col++;
+            $sheet->setCellValue('H' . $col, '=SUM(H2:H' . ($col-1) . ')');
+            $sheet->setCellValue('I' . $col, '=SUM(I2:I' . ($col-1) . ')');
+            $sheet->setCellValue('M' . $col, '=SUM(M2:M' . ($col-1) . ')');
+            $sheet->setCellValue('N' . $col, '=SUM(N2:N' . ($col-1) . ')');
+            $sheet->setCellValue('O' . $col, '=SUM(O2:O' . ($col-1) . ')');
+            $sheet->setCellValue('P' . $col, '=SUM(P2:P' . ($col-1) . ')');
+            //dd($col);
 
             $writer = new Xlsx($spreadsheet);
 
             header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            header('Content-Disposition: attachment;filename="myfile.xlsx"');
+            header('Content-Disposition: attachment;filename="Ventas_desde_' . $request->desde . '_hasta_' . $request->hasta . '_.xlsx"');
             header('Cache-Control: max-age=0');
 
             $writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
